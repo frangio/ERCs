@@ -7,22 +7,22 @@ status: Draft
 type: Standards Track
 category: ERC
 created: 2024-01-26
-requires: 6909, 5267, 712
+requires: 6909, 5267, 712, 165
 ---
 
 ## Abstract
 
-This ERC extends ERC-6909 with a combination of temporary approval and approve-by-signature mechanisms, addressing known usability and security issues inherited from prior token standards. Temporary approval allows a token holder to delegate access to their assets for the scope of a function call with predetermined parameters, removing a significant source of overexposure to smart contract risk. Approve-by-signature allows a third-party to act on behalf of the token holder, removing the burden of acquiring and holding the gas token.
+ERC-6909X extends the ERC-6909 token standard with a combination of temporary approval and approve-by-signature mechanisms, addressing known usability and security issues inherited from prior token standards. Temporary approval allows a token holder to delegate access to their assets for the scope of a function call with predetermined parameters, removing a significant source of overexposure to smart contract risk. Approve-by-signature allows a third-party to act on behalf of the token holder, removing the burden of acquiring and holding the gas token.
 
 ## Motivation
 
 The first Ethereum token standard, ERC-20, introduced `approve` and `transferFrom` as the main way for tokens to be used with protocols, with subsequent token standards largely following the same or an equivalent pattern. In a sense, it has been successful, but it has also been widely criticized. Many alternatives have been proposed since then, although none have gained wide adoption. This ERC agrees with the criticism, arguing that the pattern has usability and security problems that go hand in hand.
 
-First note that interaction with a protocol under this pattern requires a token holder to send two separate transactions: 1) a transaction invoking the token's `approve` function to allow a protocol contract to spend some of their balance, and 2) a transaction to invoke the desired protocol operation, which will pull the approved tokens using `transferFrom`. Each additional transaction adds monetary cost, friction, and cognitive overhead to the usage of a protocol.
+First note that interaction with a protocol under this pattern requires a token holder to send two separate transactions: 1) a transaction invoking the token's `approve` function to allow a protocol contract to spend some of their balance, and 2) a transaction to invoke the desired protocol operation, which will pull the approved tokens using `transferFrom`. Each additional transaction adds multiple costs to the usage of a protocol, such as gas fees, friction, and cognitive overhead.
 
-To minimize the aforementioned costs, it has become common to implement the "infinite approval" pattern, where the token holder is encouraged to approve an effectively or actually infinite amount of tokens to the protocol, so that `approve` transactions are not required beyond the first interaction with it. This has significant security consequences. The protocol contract is granted unrestricted access to the user's assets for an indefinite amount of time, far beyond what is needed for an interaction with the protocol, overly exposing users to smart contract risk (i.e., bugs that may later be discovered and exploited).
+To minimize these costs, it has become common to implement the "infinite approval" pattern, where the token holder is encouraged to approve an effectively or actually infinite amount of tokens to the protocol, so that `approve` transactions are not required beyond the first interaction with it. This has significant security consequences. The protocol contract is granted unrestricted access to the user's assets for an indefinite amount of time, far beyond what is needed for an interaction with the protocol, overly exposing users to smart contract risk (i.e., bugs that may later be discovered and exploited).
 
-ERC-6909 has adopted this pattern in its core interface, but as a new and incompatible token standard it presents an opportunity. The goal of this ERC is to develop an alternative pattern that addresses the friction points without resorting to infinite approval.
+ERC-6909 has adopted this pattern in its core interface, but as a new token standard and potential new token ecosystem it presents an opportunity to improve on the satus quo. The goal of this ERC is to develop an alternative pattern that addresses the friction points without resorting to infinite approval.
 
 ## Specification
 
@@ -30,20 +30,20 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### Overview
 
-An ERC-6909 token MAY implement the extension described here, henceforth called "ERC-6909-X".
+An ERC-6909 token MAY implement the extension described here, henceforth called "ERC-6909X".
 
-An ERC-6909-X token MUST implement the three additional functions specified below, and summarized in the following table along with the core ERC-6909 function `approve`:
+An ERC-6909X token MUST implement the three additional functions specified below, and summarized in the following table along with the core ERC-6909 function `approve`:
 
 | Authentication | Permanent | Temporary |
 | ---- | ---- | ---- |
 | Native | `approve` | `temporaryApproveAndCall` |
 | EIP-712 Signature | `approveBySig` | `temporaryApproveAndCallBySig` |
 
-The contract MUST implement ERC-5267 (Retrieval of EIP-712 domain).
+Additionally, an ERC-6909X token MUST implement ERC-5267 (Retrieval of EIP-712 domain), and ERC-165 declaring support for the ERC-6909X interface id `...`.
 
 ### Common Parameters
 
-Each of the three functions receives a subset of the following parameters.
+Each of the three new functions receives a subset of the following parameters:
 
 - `owner` (`address`): The owner of the tokens that are being approved.
 - `spender` (`address`): The account that will be able to spend the approved tokens.
@@ -58,12 +58,12 @@ Each of the three functions receives a subset of the following parameters.
 
 The functions `approveBySig` and `temporaryApproveAndCallBySig` receive a signature as a `bytes` value.
 
-At least the following signature encodings MUST be accepted:
+At least the following signature types and encodings MUST be accepted:
 
-- 65 byte concatenation of `r`, `s`, and `v` fields of an ECDSA signature.
-- Opaque EIP-1271 signature.
+- ECDSA signature encoded as the 65-byte concatenation of `r`, `s`, and `v`.
+- EIP-1271 signature (opaque).
 
-This signature MUST be validated as an EIP-712 signature, for the contract's domain (see ERC-5267), of an object with the following type:
+This signature MUST be validated as an EIP-712 signature for the contract's domain (see ERC-5267) of an object with the following type:
 
 ```solidity
 struct ERC6909XApproveAndCall {
@@ -172,9 +172,9 @@ The meaning of each field is as specified in the previous section. Additionally,
 
 ### Callback
 
-A contract MUST implement the function `onTemporaryApprove` if it is meant to be used as the `target` parameter of `temporaryApproveAndCall[BySig]`.
+A contract MUST implement the callback function `onTemporaryApprove` if it is meant to be used as the `target` parameter of `temporaryApproveAndCall[BySig]`.
 
-The return value MUST be the function selector: `0xb74de3da`.
+The callback MAY revert. Otherwise, it MUST return the value `0xb74de3da` (i.e., the function selector for this function).
 
 ```yaml
 - name: onTemporaryApprove
