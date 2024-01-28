@@ -76,15 +76,25 @@ struct ERC6909XApproveAndCall {
     address target;
     bytes data;
     uint256 nonce;
-    uint256 deadline;
+    uint48 deadline;
 }
 ```
 
 The meaning of each field is as specified in the previous section. Additionally, `temporary` determines whether the signature is intended for `approveBySig` (`temporary = false`) or `temporaryApproveAndCallBySig` (`temporary = true`), and a signature MUST be considered invalid if submitted to the wrong function. `nonce` MUST be the next available nonce for the owner, and the contract MUST consider invalid a signature that reuses a nonce.
 
-### Token Methods
+### Added Token Functions
+
+The behavior described below is REQUIRED unless explicitly described otherwise.
 
 #### `temporaryApproveAndCall`
+
+If `operator = false`, sets `amount` as the caller's allowance for `spender` for token `id`. If `operator = true`, reverts if `amount` or `id` are non-zero, and otherwise sets `spender` as an operator for the caller.
+
+With allowance or operator set, invokes the callback `onTemporaryApprove` on `target`, forwarding the parameters `operator`, `id`, `amount`, and `data`, and setting `owner` to the caller. Validates that the callback returns the value `0xb74de3da`.
+
+After the callback returns, resets operator status and allowance to their values prior to this function call.
+
+An implementation MAY use EIP-1153 transient storage to store temporary allowance and operator status.
 
 ```yaml
 - name: temporaryApproveAndCall
@@ -111,6 +121,18 @@ The meaning of each field is as specified in the previous section. Additionally,
 ```
 
 #### `temporaryApproveAndCallBySig`
+
+Validates that the signature was produced by `owner` as described in the Signatures section, and that `deadline` is greater than or equal to the block timestamp, then marks the nonce as used.
+
+The rest of this function behaves like `temporaryApproveAndCall`, substituting the signer for the caller.
+
+If `operator = false`, sets `amount` as the signer's allowance for `spender` for token `id`. If `operator = true`, reverts if `amount` or `id` are non-zero, and otherwise sets `spender` as an operator for the signer.
+
+With allowance or operator set, invokes the callback `onTemporaryApprove` on `target`, forwarding the parameters `operator`, `id`, `amount`, and `data`, and setting `owner` to the signer. Validates that the callback returns the value `0xb74de3da`.
+
+After the callback returns, resets operator status and allowance to their values prior to this function call.
+
+An implementation MAY use EIP-1153 transient storage to store temporary allowance and operator status.
 
 ```yaml
 - name: temporaryApproveAndCallBySig
@@ -144,6 +166,10 @@ The meaning of each field is as specified in the previous section. Additionally,
 
 #### `approveBySig`
 
+Validates that the signature was produced by `owner` as described in the Signatures section, and that `deadline` is greater than or equal to the block timestamp, then marks the nonce as used.
+
+The rest of this function behaves like ERC-6909 `approve`, substituting the signer for the caller.
+
 ```yaml
 - name: approveBySig
   type: function
@@ -170,7 +196,9 @@ The meaning of each field is as specified in the previous section. Additionally,
       type: bool
 ```
 
-### Callback
+### Callback Function
+
+#### `onTemporaryApprove`
 
 A contract MUST implement the callback function `onTemporaryApprove` if it is meant to be used as the `target` parameter of `temporaryApproveAndCall[BySig]`.
 
@@ -224,17 +252,6 @@ TBD
 -->
 
 No backward compatibility issues found.
-
-## Test Cases
-
-<!--
-  This section is optional for non-Core EIPs.
-
-  The Test Cases section should include expected input/output pairs, but may include a succinct set of executable tests. It should not include project build files. No new requirements may be be introduced here (meaning an implementation following only the Specification section should pass all tests here.)
-  If the test suite is too large to reasonably be included inline, then consider adding it as one or more files in `../assets/eip-####/`. External links will not be allowed
-
-  TODO: Remove this comment before submitting
--->
 
 ## Reference Implementation
 
