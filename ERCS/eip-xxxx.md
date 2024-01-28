@@ -30,7 +30,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### Overview
 
-An ERC-6909 token MAY implement the extension described here, known as "ERC-6909X".
+An ERC-6909 token MAY implement the extension described here, known as "ERC-6909X". If it does, it MUST declare support for the ERC-6909X interface ID, `0xeb858add`.
 
 An ERC-6909X token MUST implement the Added Token Functions specified below. This includes three additional functions to set allowance and operators, summarized in the following table with the core ERC-6909 `approve` and `setOperator` functions.
 
@@ -39,7 +39,7 @@ An ERC-6909X token MUST implement the Added Token Functions specified below. Thi
 | Native | _`approve`, `setOperator`_ | `temporaryApproveAndCall` |
 | EIP-712 Signature | `approveBySig` | `temporaryApproveAndCallBySig` |
 
-Additionally, an ERC-6909X token MUST implement ERC-5267 (Retrieval of EIP-712 domain), and ERC-165 (Standard Interface Detection) declaring support for the ERC-6909X interface ID `0xeb858add`.
+Additionally, an ERC-6909X token MUST implement ERC-5267 (Retrieval of EIP-712 domain).
 
 ### Common Parameters
 
