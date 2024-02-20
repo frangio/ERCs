@@ -18,9 +18,9 @@ An extension of the ERC-6909 token standard with a combination of temporary appr
 
 The first Ethereum token standard, ERC-20, introduced `approve` and `transferFrom` as the main way for protocols to work with users' tokens, with subsequent token standards largely following the same or an equivalent pattern. In a sense, it has been successful, but it has also been widely criticized. Many alternatives have been proposed since then, although none have gained wide adoption. This ERC agrees with the criticism, arguing that the pattern has usability and security problems that go hand in hand.
 
-First note that interaction with a protocol under this pattern requires a token holder to send two separate transactions: 1) a transaction invoking the token's `approve` function to allow a protocol contract to spend some of their balance, and 2) a transaction to invoke the desired protocol operation, which will pull the approved tokens using `transferFrom`. Each additional transaction adds multiple costs to the usage of a protocol, such as gas fees, friction, and cognitive overhead.
+First note that interaction with a protocol under this pattern requires a token holder to send two separate transactions: 1) a transaction invoking the token's `approve` function to allow a protocol contract to spend some of their balance, and 2) a transaction to invoke the desired protocol operation, which may pull the approved tokens using `transferFrom`. Each additional transaction adds multiple costs to the usage of a protocol, such as gas fees, friction, and cognitive overhead.
 
-To minimize these costs, it has become common to implement the "infinite approval" pattern, where the token holder is encouraged to approve an effectively or actually infinite amount of tokens to the protocol, so that `approve` transactions are not required beyond the first interaction with it. This has significant security consequences. The protocol contract is granted potentially unrestricted access to the user's assets for an indefinite amount of time, far beyond what is needed for an interaction with the protocol, overly exposing users to smart contract risk (i.e., bugs that may later be discovered and exploited).
+In an attempt to minimize these costs, it has become common to implement the "infinite approval" pattern, where the token holder is encouraged to approve an effectively or actually infinite amount of tokens to the protocol, so that `approve` transactions are not required beyond a first interaction. While `approve`-related friction is reduced, this is comes with a significant security cost. The protocol contract is granted potentially unrestricted access to the user's assets for an indefinite amount of time, far beyond what is needed for an interaction with the protocol, and as a result users are overly exposed to smart contract risk, i.e., bugs that may later be discovered and exploited.
 
 ERC-6909 has adopted both of these patterns in its core interface, but as a new token standard and potential new token ecosystem it presents an opportunity to improve on the satus quo. The goal of this ERC is to develop an alternative pattern that addresses the friction points without resorting to infinite approval.
 
@@ -30,7 +30,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### Overview
 
-An ERC-6909 token MAY implement the extension described here, known as "ERC-6909X". If it does, it MUST declare support for the ERC-6909X interface ID, `0xeb858add`.
+An ERC-6909 token MAY implement the extension described here, known as "ERC-6909X". If it does, it MUST declare support for the ERC-6909X interface ID, `0x4a31d207`.
 
 An ERC-6909X token MUST implement the Added Token Functions specified below. This includes three additional functions to set allowance and operators, summarized in the following table with the core ERC-6909 `approve` and `setOperator` functions.
 
@@ -38,6 +38,8 @@ An ERC-6909X token MUST implement the Added Token Functions specified below. Thi
 | ---- | ---- | ---- |
 | Native | _`approve`, `setOperator`_ | `temporaryApproveAndCall` |
 | EIP-712 Signature | `approveBySig` | `temporaryApproveAndCallBySig` |
+
+An ERC-6909X token MAY implement the Optional Nonce Management Functions specified below.
 
 Additionally, an ERC-6909X token MUST implement ERC-5267 (Retrieval of EIP-712 domain).
 
@@ -52,7 +54,8 @@ Each of the three new functions is some form of token approval and receives a su
 - `amount` (`uint256`): The amount of tokens that are approved. If `operator` is `true`, this parameter MUST be 0.
 - `target` (`address`): The target contract where the callback SHALL be invoked.
 - `data` (`bytes`): The data to be included with the callback.
-- `deadline` (`uint48`): A timestamp after which a provided signature MUST be rejected even if valid.
+- `deadline` (`uint48`): A timestamp after which a provided signature MUST be rejected even if otherwise valid.
+- `nonce` (`uint256`): A value used by the contract to prevent signature replay.
 
 ### Signatures
 
@@ -80,11 +83,17 @@ struct ERC6909XApproveAndCall {
 }
 ```
 
-The meaning of each field is as specified in the previous section. Additionally, `temporary` determines whether the signature is intended for `approveBySig` (`temporary = false`) or `temporaryApproveAndCallBySig` (`temporary = true`), and a signature MUST be considered invalid if submitted to the wrong function. `nonce` MUST be the next available nonce for the owner, and the contract MUST consider invalid a signature that reuses a nonce.
+`temporary` determines whether the signature is intended for `approveBySig` (`temporary = false`) or `temporaryApproveAndCallBySig` (`temporary = true`). A signature MUST be rejected if submitted to the wrong function.
+
+Any `nonce` value previously unused as a nonce by the signer MUST be accepted. A signature MUST be considered invalid if its nonce was previously used. It is RECOMMENDED to choose a random nonce for every new signature.
+
+`deadline` is a timestamp starting at which the signature MUST be rejected.
+
+The meaning of the remaining fields is as specified in the previous section.
 
 ### Added Token Functions
 
-The behavior described below is REQUIRED unless explicitly described otherwise.
+The behavior described below is REQUIRED unless it is explicitly stated otherwise.
 
 #### `temporaryApproveAndCall`
 
@@ -95,6 +104,8 @@ With allowance or operator set, invokes the callback `onTemporaryApprove` on `ta
 After the callback returns, resets operator status and allowance to their values prior to this function call.
 
 An implementation MAY use EIP-1153 transient storage to store temporary allowance and operator status.
+
+Returns `true`.
 
 ```yaml
 - name: temporaryApproveAndCall
@@ -134,6 +145,8 @@ After the callback returns, resets operator status and allowance to their values
 
 An implementation MAY use EIP-1153 transient storage to store temporary allowance and operator status.
 
+Returns `true`.
+
 ```yaml
 - name: temporaryApproveAndCallBySig
   type: function
@@ -156,6 +169,8 @@ An implementation MAY use EIP-1153 transient storage to store temporary allowanc
       type: bytes
     - name: deadline
       type: uint48
+    - name: nonce
+      type: uint256
     - name: signature
       type: bytes
 
@@ -168,7 +183,9 @@ An implementation MAY use EIP-1153 transient storage to store temporary allowanc
 
 Validates that the signature was produced by `owner` as described in the Signatures section, and that `deadline` is greater than or equal to the block timestamp, then marks the nonce as used.
 
-The rest of this function behaves like ERC-6909 `approve`, substituting the signer for the caller.
+The rest of this function behaves like ERC-6909 `approve` or `setOperator` (if `operator` is false or true respectively), substituting the signer for the caller.
+
+Returns `true`.
 
 ```yaml
 - name: approveBySig
@@ -188,6 +205,8 @@ The rest of this function behaves like ERC-6909 `approve`, substituting the sign
       type: uint256
     - name: deadline
       type: uint48
+    - name: nonce
+      type: uint256
     - name: signature
       type: bytes
 
@@ -195,6 +214,44 @@ The rest of this function behaves like ERC-6909 `approve`, substituting the sign
     - name: status
       type: bool
 ```
+
+### Optional Nonce Management Functions
+
+#### `invalidateNonce`
+
+Causes `nonce` to be considered invalid for future signatures by the caller, as if it had been used in an accepted signature.
+
+MUST emit a `NonceInvalidation` event.
+
+```yaml
+- name: invalidateNonce
+  type: function
+  stateMutability: nonpayable
+
+  inputs:
+    - name: nonce
+      type: uint256
+```
+
+#### `NonceInvalidation`
+
+Emitted when a nonce is invalidated.
+
+MAY be emitted when a nonce is used as part of an accepted signature.
+
+```yaml
+- name: NonceInvalidation
+  type: event
+
+  inputs:
+    - name: owner
+      type: address
+      indexed: true
+    - name: nonce
+      type: uint256
+      indexed: true
+```
+
 
 ### Callback Function
 
@@ -240,41 +297,25 @@ TBD
 
 ## Backwards Compatibility
 
-<!--
+### `Approval` and `OperatorSet` Events
 
-  This section is optional.
-
-  All EIPs that introduce backwards incompatibilities must include a section describing these incompatibilities and their severity. The EIP must explain how the author proposes to deal with these incompatibilities. EIP submissions without a sufficient backwards compatibility treatise may be rejected outright.
-
-  The current placeholder is acceptable for a draft.
-
-  TODO: Remove this comment before submitting
--->
-
-No backward compatibility issues found.
-
-## Reference Implementation
-
-<!--
-  This section is optional.
-
-  The Reference Implementation section should include a minimal implementation that assists in understanding or implementing this specification. It should not include project build files. The reference implementation is not a replacement for the Specification section, and the proposal should still be understandable without it.
-  If the reference implementation is too large to reasonably be included inline, then consider adding it as one or more files in `../assets/eip-####/`. External links will not be allowed.
-
-  TODO: Remove this comment before submitting
--->
+ERC-6909 requires `Approval` and `OperatorSet` events to be emitted when allowance and operator status respectively are set. ERC-6909X tokens SHOULD emit these events as part of temporary approvals for strict compliance. The omission of these events during temporary approvals may confuse indexers that rely on events to track allowances and operators. For example, an indexer that assumes the events are complete may conclude that a spender has zero allowance in a case where in fact it has non-zero allowance.
 
 ## Security Considerations
 
-<!--
-  All EIPs must contain a section that discusses the security implications/considerations relevant to the proposed change. Include information that might be important for security discussions, surfaces risks and can be used throughout the life cycle of the proposal. For example, include security-relevant design decisions, concerns, important discussions, implementation-specific guidance and pitfalls, an outline of threats and risks and how they are being addressed. EIP submissions missing the "Security Considerations" section will be rejected. An EIP cannot proceed to status "Final" without a Security Considerations discussion deemed sufficient by the reviewers.
+### Frontrunning
 
-  The current placeholder is acceptable for a draft.
+The signatures used by this ERC are not by themselves bound to a caller: they can be submitted to the token by anyone, and, in particular, can be taken from the mempool and submitted in a frontrunning transaction. This applies to both `temporaryAppoveAndCallBySig` and `approveBySig`.
 
-  TODO: Remove this comment before submitting
--->
+If a transaction invokes one of these functions on the token directly, frontrunning can in general only result in wasted gas, unless the callback invoked during temporary approval makes use of the transaction origin, which is controlled by the attacker during frontrunning. (Relying on the transaction origin in a smart contract is considered bad practice.)
 
-Needs discussion.
+If a transaction invokes one of these functions indirectly, in the context of a larger transaction, it is important to consider the following two consequences:
+
+1. An attacker can frontrun the signature and cause the call to the token function to revert (since the signature is already used at that point). In the absence of other frontrunning protection, a contract should allow the token call to revert.
+2. An attacker can take the signature and submit it in a different context. Contracts should not interpret a signature as an intent to do anything other than what is explicitly contained in the signature. For example, a signature meant for `approveBySig` should only be interpreted as the intent to set an allowance, and not should not be interpreted as an authorization to spend the approved tokens in any particular way.
+
+The general recommendation is to use temporary approve with a callback to execute additional logic.
+
 
 ## Copyright
 
