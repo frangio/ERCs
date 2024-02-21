@@ -223,6 +223,8 @@ Causes `nonce` to be considered invalid for future signatures by the caller, as 
 
 MUST emit a `NonceInvalidation` event.
 
+_Note that, if this function is not included, it is possible for a signer to invalidate a nonce by generating and submitting a signature to one of the signature validating functions, such as `approveBySig`._
+
 ```yaml
 - name: invalidateNonce
   type: function
@@ -285,15 +287,9 @@ The callback MAY revert. Otherwise, it MUST return the value `0xb74de3da` (i.e.,
 
 ## Rationale
 
-<!--
-  The rationale fleshes out the specification by describing what motivated the design and why particular design decisions were made. It should describe alternate designs that were considered and related work, e.g. how the feature is supported in other languages.
+### Unordered Nonces
 
-  The current placeholder is acceptable for a draft.
-
-  TODO: Remove this comment before submitting
--->
-
-TBD
+The use of sequential nonces in other standards like ERC-2612 has proved insufficient, as it implies that a token owner can have only one valid outstanding signature at a time. Different mechanisms have been proposed to address this, such as allowing multiple parallel nonce "timelines" for a single signer. Here we have opted for the approach of removing the sequentiality requirement, which has been adopted by standards like ERC-3009, do to its simplicity and sufficiency.
 
 ## Backwards Compatibility
 
