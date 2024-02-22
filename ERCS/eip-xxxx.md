@@ -87,7 +87,7 @@ struct ERC6909XApproveAndCall {
 
 Any `nonce` value previously unused as a nonce by the signer MUST be accepted. A signature MUST be considered invalid if its nonce was previously used. It is RECOMMENDED to choose a random nonce for every new signature.
 
-`deadline` is a timestamp starting at which the signature MUST be rejected.
+`deadline` is a timestamp after which the signature MUST be rejected.
 
 The meaning of the remaining fields is as specified in the previous section.
 
